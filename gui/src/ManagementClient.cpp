@@ -151,7 +151,13 @@ void ManagementClient::processLine(const QString &line)
     }
 
     if (pendingHistory_.isEmpty())
+    {
+        // outside of a history dump the worker sends its final error
+        // unprefixed, e.g. when the profile or a file it refers to can't be read
+        if (!line.trimmed().isEmpty())
+            emit fatal(line.trimmed());
         return;
+    }
 
     if (line == "END")
     {
