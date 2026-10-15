@@ -40,6 +40,25 @@ QString fileSafe(QString s)
     return s.replace(bad, "_");
 }
 
+// omicliagent sets up the tunnel through the ovpnagent service
+bool workerNeedsAgent(const QString &workerPath)
+{
+    return QFileInfo(workerPath).baseName().compare("omicliagent", Qt::CaseInsensitive) == 0;
+}
+
+bool agentRunning()
+{
+#ifdef Q_OS_WIN
+    // fails with ERROR_FILE_NOT_FOUND if nobody serves the pipe,
+    // ERROR_SEM_TIMEOUT only means all its instances are busy
+    if (::WaitNamedPipeW(L"\\\\.\\pipe\\ovpnagent", 0))
+        return true;
+    return ::GetLastError() != ERROR_FILE_NOT_FOUND;
+#else
+    return true;
+#endif
+}
+
 } // namespace
 
 Connection::Connection(const QString &name, const QString &configPath, QObject *parent)
@@ -157,6 +176,17 @@ void Connection::start(const QString &workerPath, const QString &logDir)
         fatalError_ = tr("Worker not found: %1").arg(QDir::toNativeSeparators(workerPath));
         appendLog(fatalError_);
         setState(State::Failed, fatalError_);
+        emit errorOccurred(fatalError_);
+        return;
+    }
+
+    if (workerNeedsAgent(workerPath) && !agentRunning())
+    {
+        fatalError_ = tr("The ovpnagent service is not running. Start it from an elevated prompt with "
+                         "\"ovpnagent.exe install\" or \"ovpnagent.exe run\", or select omicli.exe in "
+                         "Settings and run the GUI as administrator.");
+        appendLog(fatalError_);
+        setState(State::Failed, tr("ovpnagent service is not running"));
         emit errorOccurred(fatalError_);
         return;
     }
