@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSI package of the OpenVPN3 GUI: the GUI with its Qt runtime, the
+  omicli/omicliagent workers and the ovpnagent service. Built by
+  build.ps1, which stages the files and passes StageDir, Version and
+  LicenseRtf.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="OpenVPN3"
+           Manufacturer="OpenVPN3 GUI"
+           Version="$(Version)"
+           UpgradeCode="{6E0B6B8C-3F4A-4C47-9A1D-2B57F0E4C1A3}"
+           Scope="perMachine"
+           Language="1049"
+           Codepage="1251">
+
+    <MajorUpgrade DowngradeErrorMessage="Уже установлена более новая версия OpenVPN3." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="OpenVPN3" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="OpenVPN3" Description="Графический клиент, рабочие процессы и служба ovpnagent."
+             Level="1" AllowAbsent="no" Display="expand" ConfigurableDirectory="INSTALLFOLDER">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="AgentService" />
+      <ComponentRef Id="GuiExe" />
+      <ComponentRef Id="StartMenuShortcut" />
+
+      <Feature Id="Autostart" Title="Запуск при входе в Windows"
+               Description="Запускать OpenVPN3 в области уведомлений при входе любого пользователя." Level="1">
+        <ComponentRef Id="AutostartRun" />
+      </Feature>
+    </Feature>
+
+    <!-- everything but the GUI and service binaries, which need their own components -->
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(StageDir)\**">
+        <Exclude Files="$(StageDir)\ovpnagent.exe" />
+        <Exclude Files="$(StageDir)\ovpn3-gui.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <Component Id="GuiExe" Directory="INSTALLFOLDER">
+      <File Id="ovpn3gui.exe" Source="$(StageDir)\ovpn3-gui.exe" KeyPath="yes" />
+    </Component>
+
+    <!-- Windows Installer wants an HKCU key path for a non-advertised shortcut (ICE38/43/57) -->
+    <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder">
+      <Shortcut Id="GuiShortcut" Name="OpenVPN3" Description="VPN-подключения OpenVPN3"
+                Target="[INSTALLFOLDER]ovpn3-gui.exe" WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\OpenVPN3\Installer" Name="StartMenuShortcut"
+                     Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- privileged service that sets up the tunnels for the workers -->
+    <Component Id="AgentService" Directory="INSTALLFOLDER">
+      <File Id="ovpnagent.exe" Source="$(StageDir)\ovpnagent.exe" KeyPath="yes" />
+      <ServiceInstall Name="ovpnagent"
+                      DisplayName="OpenVPN Agent ovpnagent"
+                      Description="Настраивает VPN-туннели для OpenVPN3 без прав администратора у пользователя."
+                      Type="ownProcess"
+                      Start="auto"
+                      ErrorControl="normal"
+                      Account="LocalSystem"
+                      Vital="yes">
+        <util:ServiceConfig FirstFailureActionType="restart"
+                            SecondFailureActionType="restart"
+                            ThirdFailureActionType="restart"
+                            RestartServiceDelayInSeconds="5"
+                            ResetPeriodInDays="1" />
+      </ServiceInstall>
+      <ServiceControl Id="ovpnagent" Name="ovpnagent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+    </Component>
+
+    <Component Id="AutostartRun" Directory="INSTALLFOLDER">
+      <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="OpenVPN3 GUI"
+                     Type="string" Value="&quot;[INSTALLFOLDER]ovpn3-gui.exe&quot;" KeyPath="yes" />
+    </Component>
+
+    <!-- UI: feature selection, then optionally start the GUI as the installing user -->
+    <WixVariable Id="WixUILicenseRtf" Value="$(LicenseRtf)" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Запустить OpenVPN3" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <CustomAction Id="LaunchGui" BinaryRef="Wix4UtilCA_X64" DllEntry="WixShellExec" Impersonate="yes" Return="ignore" />
+
+    <ui:WixUI Id="WixUI_FeatureTree" />
+    <UI>
+      <!-- the target is set here, as INSTALLFOLDER is only known at run time -->
+      <Publish Dialog="ExitDialog" Control="Finish" Property="WixShellExecTarget" Value="[INSTALLFOLDER]ovpn3-gui.exe"
+               Order="1" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchGui"
+               Order="2" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+    </UI>
+  </Package>
+</Wix>

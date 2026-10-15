@@ -37,6 +37,24 @@ The build copies `omicliagent.exe`, `omicli.exe` and their DLLs from
 `OVPN3_WORKER_DIR` (default `build/msvc/amd64/openvpn/omi/Release`) and runs
 `windeployqt`, so `build/gui/Release` is directly runnable.
 
+## Installer
+
+`installer/build.ps1` stages the GUI, the workers, `ovpnagent.exe` and the
+MSVC runtime from the existing builds and packs them into an MSI with WiX 5
+(`dotnet tool install --global wix --version 5.0.2`):
+
+```bash
+powershell -ExecutionPolicy Bypass -File gui/installer/build.ps1
+```
+
+The result is `build/installer/OpenVPN3-<version>-x64.msi`. It installs to
+`Program Files\OpenVPN3`, registers and starts the `ovpnagent` service, adds a
+Start menu shortcut and optionally starts the GUI at logon. The installer UI is
+in Russian. A TAP, Wintun or ovpn-dco-win driver is not included and has to be
+present already, e.g. from OpenVPN Community or OpenVPN Connect.
+
+Uninstalling keeps the per-user data: profiles, settings and saved passwords.
+
 ## Translations
 
 The interface follows the system language; Russian is included. After
