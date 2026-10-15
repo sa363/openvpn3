@@ -37,6 +37,18 @@ The build copies `omicliagent.exe`, `omicli.exe` and their DLLs from
 `OVPN3_WORKER_DIR` (default `build/msvc/amd64/openvpn/omi/Release`) and runs
 `windeployqt`, so `build/gui/Release` is directly runnable.
 
+## Translations
+
+The interface follows the system language; Russian is included. After
+changing user visible strings, refresh the `.ts` files and translate the new
+entries, e.g. with Qt Linguist:
+
+```bash
+cmake --build build/gui --target update_translations
+```
+
+To add a language, append it to `OVPN3_GUI_LANGUAGES` in `CMakeLists.txt`.
+
 ## Running
 
 1. Install and start the agent from an elevated prompt:

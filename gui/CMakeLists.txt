@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network LinguistTools)
 qt_standard_project_setup()
 
 qt_add_executable(ovpn3-gui WIN32
@@ -41,6 +41,30 @@ endif()
 
 if (MSVC)
     target_compile_options(ovpn3-gui PRIVATE /W4 /utf-8)
+endif()
+
+# Translations, embedded under :/i18n and picked by the system locale.
+# Run the update_translations target after changing user visible strings.
+set(OVPN3_GUI_LANGUAGES ru)
+set(OVPN3_GUI_TS_FILES)
+foreach (lang IN LISTS OVPN3_GUI_LANGUAGES)
+    list(APPEND OVPN3_GUI_TS_FILES translations/ovpn3-gui_${lang}.ts)
+endforeach()
+qt_add_translations(ovpn3-gui
+    TS_FILES ${OVPN3_GUI_TS_FILES}
+    RESOURCE_PREFIX /i18n
+    LUPDATE_OPTIONS -locations none -no-obsolete)
+
+# Qt's own strings (standard buttons, file dialogs) for the same languages
+set(_qt_tr_dir "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}")
+set(_qt_qm_files)
+foreach (lang IN LISTS OVPN3_GUI_LANGUAGES)
+    if (EXISTS "${_qt_tr_dir}/qtbase_${lang}.qm")
+        list(APPEND _qt_qm_files "${_qt_tr_dir}/qtbase_${lang}.qm")
+    endif()
+endforeach()
+if (_qt_qm_files)
+    qt_add_resources(ovpn3-gui qt_translations PREFIX /i18n BASE "${_qt_tr_dir}" FILES ${_qt_qm_files})
 endif()
 
 # The workers (omicliagent.exe, omicli.exe) come from the core build.

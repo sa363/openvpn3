@@ -9,9 +9,11 @@
 #include <QDir>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QLocale>
 #include <QMessageBox>
 #include <QSystemTrayIcon>
 #include <QTimer>
+#include <QTranslator>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -50,6 +52,16 @@ int main(int argc, char *argv[])
     QApplication::setApplicationDisplayName("OpenVPN3");
     QApplication::setApplicationVersion(OVPN3_GUI_VERSION);
     QApplication::setQuitOnLastWindowClosed(false);
+
+    // the GUI's and Qt's own translations for the system language
+    for (const QString &base : {QStringLiteral("ovpn3-gui"), QStringLiteral("qtbase")})
+    {
+        auto *translator = new QTranslator(&app);
+        if (translator->load(QLocale(), base, "_", ":/i18n"))
+            QApplication::installTranslator(translator);
+        else
+            delete translator;
+    }
 
     QCommandLineParser parser;
     parser.setApplicationDescription("OpenVPN3 GUI");

@@ -288,9 +288,9 @@ void TrayController::onStateChanged(Connection *c)
     updateTray();
     if (c->state() == Connection::State::Connected)
     {
-        QString msg = tr("%1 is connected").arg(c->name());
-        if (!c->lastOmiState().localIp.isEmpty())
-            msg += tr(", address %1").arg(c->lastOmiState().localIp);
+        const QString ip = c->lastOmiState().localIp;
+        const QString msg = ip.isEmpty() ? tr("%1 is connected").arg(c->name())
+                                         : tr("%1 is connected, address %2").arg(c->name(), ip);
         tray_.showMessage(tr("OpenVPN3"), msg, Icons::forState(Connection::State::Connected));
     }
 }
