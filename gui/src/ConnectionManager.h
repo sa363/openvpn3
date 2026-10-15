@@ -26,6 +26,10 @@ class ConnectionManager : public QObject
     bool isAutoConnect(const QString &name) const;
     QString savedUsername(const QString &name) const;
     void setSavedUsername(const QString &name, const QString &username);
+    bool canSavePasswords() const;
+    QString savedPassword(const QString &name) const;
+    void setSavedPassword(const QString &name, const QString &password);
+    bool hasSavedPassword(const QString &name) const;
 
     // rescan configDir() for *.ovpn files, keeping active connections
     void reloadProfiles();

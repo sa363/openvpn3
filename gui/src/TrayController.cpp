@@ -233,20 +233,38 @@ void TrayController::watch(Connection *c)
             QDesktopServices::openUrl(u);
         else
             c->stop(); });
+    connect(c, &Connection::authenticationFailed, this, [this, c](const QString &type)
+            {
+        if (type == "Auth")
+            manager_->setSavedPassword(c->name(), QString()); });
     connect(c, &Connection::errorOccurred, this, [this](const QString &message)
             { tray_.showMessage(tr("OpenVPN3"), message, QSystemTrayIcon::Warning); });
 }
 
 void TrayController::askCredentials(Connection *c, const OmiPasswordRequest &request, const QString &dynamicChallenge)
 {
-    auto *dlg = new AuthDialog(c->name(), request, dynamicChallenge, manager_->savedUsername(c->name()));
+    // the username/password prompt, as opposed to a challenge or proxy credentials
+    const bool authPrompt = request.type == "Auth" && dynamicChallenge.isEmpty();
+    const QString savedUsername = manager_->savedUsername(c->name());
+    const QString savedPassword = authPrompt ? manager_->savedPassword(c->name()) : QString();
+
+    // sign in without asking when nothing has to be typed in
+    if (authPrompt && !savedPassword.isEmpty() && request.staticChallenge.isEmpty()
+        && (request.passwordOnly || !savedUsername.isEmpty()))
+    {
+        c->provideCredentials(request, savedUsername, savedPassword, QString());
+        return;
+    }
+
+    auto *dlg = new AuthDialog(c->name(), request, dynamicChallenge, savedUsername, savedPassword,
+                               manager_->canSavePasswords());
     dlg->setAttribute(Qt::WA_DeleteOnClose);
     connect(c, &Connection::stateChanged, dlg, [dlg, c]()
             {
         // the connection went away while the dialog was open
         if (!c->isActive())
             dlg->reject(); });
-    connect(dlg, &QDialog::finished, this, [this, dlg, c, request](int result)
+    connect(dlg, &QDialog::finished, this, [this, dlg, c, request, authPrompt](int result)
             {
         if (result != QDialog::Accepted)
         {
@@ -256,6 +274,9 @@ void TrayController::askCredentials(Connection *c, const OmiPasswordRequest &req
         }
         if (!request.passwordOnly && request.type == "Auth")
             manager_->setSavedUsername(c->name(), dlg->rememberUsername() ? dlg->username() : QString());
+        // saved before it is verified, an authentication failure removes it again
+        if (authPrompt)
+            manager_->setSavedPassword(c->name(), dlg->rememberPassword() ? dlg->password() : QString());
         c->provideCredentials(request, dlg->username(), dlg->password(), dlg->challengeResponse()); });
     dlg->show();
     dlg->raise();

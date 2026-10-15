@@ -94,6 +94,8 @@ class Connection : public QObject
     void credentialsNeeded(const OmiPasswordRequest &request, const QString &dynamicChallenge);
     void webAuthRequested(const QString &url);
     void errorOccurred(const QString &message);
+    // the server rejected the credentials (not a dynamic challenge)
+    void authenticationFailed(const QString &type);
 
   private:
     void setState(State state, const QString &detail = QString());

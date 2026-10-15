@@ -11,6 +11,8 @@ AuthDialog::AuthDialog(const QString &profile,
                        const OmiPasswordRequest &request,
                        const QString &dynamicChallenge,
                        const QString &savedUsername,
+                       const QString &savedPassword,
+                       bool canSavePassword,
                        QWidget *parent)
     : QDialog(parent)
 {
@@ -38,7 +40,7 @@ AuthDialog::AuthDialog(const QString &profile,
             username_ = new QLineEdit(savedUsername);
             form->addRow(tr("Username:"), username_);
         }
-        password_ = new QLineEdit;
+        password_ = new QLineEdit(savedPassword);
         password_->setEchoMode(QLineEdit::Password);
         form->addRow(tr("Password:"), password_);
 
@@ -59,6 +61,25 @@ AuthDialog::AuthDialog(const QString &profile,
             remember_->setChecked(!savedUsername.isEmpty());
             form->addRow(remember_);
         }
+
+        if (canSavePassword && request.type == "Auth")
+        {
+            rememberPassword_ = new QCheckBox(tr("Remember password"));
+            rememberPassword_->setChecked(!savedPassword.isEmpty());
+            if (remember_)
+            {
+                // a saved password is useless without the username
+                connect(rememberPassword_, &QCheckBox::toggled, remember_, [this](bool on)
+                        {
+                    if (on)
+                        remember_->setChecked(true); });
+                connect(remember_, &QCheckBox::toggled, rememberPassword_, [this](bool on)
+                        {
+                    if (!on)
+                        rememberPassword_->setChecked(false); });
+            }
+            form->addRow(rememberPassword_);
+        }
     }
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
@@ -68,10 +89,12 @@ AuthDialog::AuthDialog(const QString &profile,
 
     if (username_ && username_->text().isEmpty())
         username_->setFocus();
-    else if (password_)
+    else if (password_ && password_->text().isEmpty())
         password_->setFocus();
     else if (response_)
         response_->setFocus();
+    else if (password_)
+        password_->setFocus();
 
     setMinimumWidth(360);
 }
@@ -94,4 +117,9 @@ QString AuthDialog::challengeResponse() const
 bool AuthDialog::rememberUsername() const
 {
     return remember_ && remember_->isChecked();
+}
+
+bool AuthDialog::rememberPassword() const
+{
+    return rememberPassword_ && rememberPassword_->isChecked();
 }

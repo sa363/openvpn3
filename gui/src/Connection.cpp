@@ -110,6 +110,7 @@ Connection::Connection(const QString &name, const QString &configPath, QObject *
         if (dynamicChallenge_.isEmpty())
         {
             appendLog(tr("%1 authentication failed").arg(type));
+            emit authenticationFailed(type);
             emit errorOccurred(tr("Authentication failed for %1").arg(name_));
         } });
     connect(&omi_, &ManagementClient::fatal, this, [this](const QString &message)

@@ -178,6 +178,9 @@ void ConnectionsWindow::showContextMenu(const QPoint &pos)
     autoConn->setChecked(manager_->isAutoConnect(c->name()));
     connect(autoConn, &QAction::toggled, this, [this, c](bool on)
             { manager_->setAutoConnect(c->name(), on); });
+    menu.addAction(tr("Forget saved password"), this, [this, c]()
+                   { manager_->setSavedPassword(c->name(), QString()); })
+        ->setEnabled(manager_->hasSavedPassword(c->name()));
     menu.exec(tree_->viewport()->mapToGlobal(pos));
 }
 

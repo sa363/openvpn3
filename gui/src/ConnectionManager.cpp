@@ -1,5 +1,7 @@
 #include "ConnectionManager.h"
 
+#include "CredentialStore.h"
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QDirIterator>
@@ -14,6 +16,7 @@ const char keyConfigDir[] = "configDir";
 const char keyWorkerPath[] = "workerPath";
 const char keyAutoConnect[] = "autoConnect";
 const char keyUsernames[] = "usernames/";
+const char keyPasswords[] = "passwords/";
 
 QString defaultConfigDir()
 {
@@ -94,6 +97,30 @@ void ConnectionManager::setSavedUsername(const QString &name, const QString &use
         QSettings().remove(keyUsernames + profileKey(name));
     else
         QSettings().setValue(keyUsernames + profileKey(name), username);
+}
+
+bool ConnectionManager::canSavePasswords() const
+{
+    return CredentialStore::isAvailable();
+}
+
+QString ConnectionManager::savedPassword(const QString &name) const
+{
+    return CredentialStore::unprotect(QSettings().value(keyPasswords + profileKey(name)).toByteArray());
+}
+
+void ConnectionManager::setSavedPassword(const QString &name, const QString &password)
+{
+    const QByteArray blob = password.isEmpty() ? QByteArray() : CredentialStore::protect(password);
+    if (blob.isEmpty())
+        QSettings().remove(keyPasswords + profileKey(name));
+    else
+        QSettings().setValue(keyPasswords + profileKey(name), blob);
+}
+
+bool ConnectionManager::hasSavedPassword(const QString &name) const
+{
+    return QSettings().contains(keyPasswords + profileKey(name));
 }
 
 void ConnectionManager::reloadProfiles()

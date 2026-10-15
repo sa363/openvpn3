@@ -19,6 +19,8 @@ qt_add_executable(ovpn3-gui WIN32
     src/ConnectionManager.h
     src/ConnectionsWindow.cpp
     src/ConnectionsWindow.h
+    src/CredentialStore.cpp
+    src/CredentialStore.h
     src/Icons.cpp
     src/Icons.h
     src/ManagementClient.cpp
@@ -33,6 +35,9 @@ qt_add_executable(ovpn3-gui WIN32
 
 target_compile_definitions(ovpn3-gui PRIVATE OVPN3_GUI_VERSION="${PROJECT_VERSION}")
 target_link_libraries(ovpn3-gui PRIVATE Qt6::Widgets Qt6::Network)
+if (WIN32)
+    target_link_libraries(ovpn3-gui PRIVATE crypt32)
+endif()
 
 if (MSVC)
     target_compile_options(ovpn3-gui PRIVATE /W4 /utf-8)

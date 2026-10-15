@@ -49,6 +49,10 @@ The build copies `omicliagent.exe`, `omicli.exe` and their DLLs from
 Without the agent, set the worker to `omicli.exe` in *Settings* and run the GUI
 as administrator.
 
+Saved passwords are encrypted with Windows DPAPI for the current user and
+kept in `HKCU\Software\OpenVPN3\ovpn3-gui`. A saved password is used to sign
+in without a prompt and is removed when the server rejects it.
+
 Worker logs are written to `%LOCALAPPDATA%\OpenVPN3\ovpn3-gui\logs`.
 
 ## Limitations
@@ -58,4 +62,3 @@ Worker logs are written to `%LOCALAPPDATA%\OpenVPN3\ovpn3-gui\logs`.
 - `block-outside-dns` of one connection also blocks DNS of the others.
 - TAP and Wintun need one adapter per simultaneous connection; ovpn-dco-win
   creates adapters on demand.
-- Passwords are not stored; only the username can be remembered.

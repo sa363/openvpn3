@@ -18,16 +18,20 @@ class AuthDialog : public QDialog
                const OmiPasswordRequest &request,
                const QString &dynamicChallenge,
                const QString &savedUsername,
+               const QString &savedPassword,
+               bool canSavePassword,
                QWidget *parent = nullptr);
 
     QString username() const;
     QString password() const;
     QString challengeResponse() const;
     bool rememberUsername() const;
+    bool rememberPassword() const;
 
   private:
     QLineEdit *username_ = nullptr;
     QLineEdit *password_ = nullptr;
     QLineEdit *response_ = nullptr;
     QCheckBox *remember_ = nullptr;
+    QCheckBox *rememberPassword_ = nullptr;
 };
