@@ -2,6 +2,7 @@
 
 #include "ConnectionManager.h"
 
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFileDialog>
@@ -9,7 +10,9 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QVBoxLayout>
 
 namespace {
@@ -57,6 +60,37 @@ SettingsDialog::SettingsDialog(ConnectionManager *manager, QWidget *parent)
                                "must then run as administrator."));
     hint->setWordWrap(true);
     form->addRow(hint);
+
+    // HTTP proxy, overrides http-proxy in the profiles
+    const ProxySettings proxy = manager->proxy();
+    useProxy_ = new QCheckBox(tr("Connect through an HTTP proxy"));
+    useProxy_->setChecked(!proxy.host.isEmpty());
+    form->addRow(useProxy_);
+    proxyHost_ = new QLineEdit(proxy.host);
+    proxyHost_->setPlaceholderText(tr("proxy.example.com"));
+    proxyPort_ = new QSpinBox;
+    proxyPort_->setRange(1, 65535);
+    proxyPort_->setValue(proxy.port ? proxy.port : 8080);
+    auto *proxyRow = new QWidget;
+    auto *proxyLayout = new QHBoxLayout(proxyRow);
+    proxyLayout->setContentsMargins(0, 0, 0, 0);
+    proxyLayout->addWidget(proxyHost_, 1);
+    proxyLayout->addWidget(new QLabel(tr("Port:")));
+    proxyLayout->addWidget(proxyPort_);
+    form->addRow(tr("Proxy:"), proxyRow);
+    auto *proxyHint = new QLabel(tr("Used for all connections instead of the http-proxy of the profiles. "
+                                    "Proxy credentials are asked for when the proxy needs them. "
+                                    "Connections through a proxy don't use ovpn-dco-win."));
+    proxyHint->setWordWrap(true);
+    form->addRow(proxyHint);
+    auto enableProxy = [this](bool on)
+    {
+        proxyHost_->setEnabled(on);
+        proxyPort_->setEnabled(on);
+    };
+    connect(useProxy_, &QCheckBox::toggled, this, enableProxy);
+    enableProxy(useProxy_->isChecked());
+
     layout->addLayout(form);
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
@@ -67,6 +101,21 @@ SettingsDialog::SettingsDialog(ConnectionManager *manager, QWidget *parent)
 
 void SettingsDialog::accept()
 {
+    const QString host = proxyHost_->text().trimmed();
+    if (useProxy_->isChecked() && host.isEmpty())
+    {
+        QMessageBox::warning(this, windowTitle(), tr("Enter the proxy host name or address."));
+        proxyHost_->setFocus();
+        return;
+    }
+    ProxySettings proxy;
+    if (useProxy_->isChecked())
+    {
+        proxy.host = host;
+        proxy.port = static_cast<quint16>(proxyPort_->value());
+    }
+    manager_->setProxy(proxy);
+
     manager_->setWorkerPath(QDir::fromNativeSeparators(workerPath_->text().trimmed()));
     const QString dir = QDir::fromNativeSeparators(configDir_->text().trimmed());
     if (dir != manager_->configDir())

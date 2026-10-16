@@ -17,6 +17,8 @@
 namespace {
 
 constexpr int maxLogLines = 5000;
+// 5 minutes of samples with the 2 s byte count interval
+constexpr int maxTrafficSamples = 150;
 constexpr int stopTimeoutMs = 5000;
 
 quint16 findFreePort()
@@ -94,6 +96,20 @@ Connection::Connection(const QString &name, const QString &configPath, QObject *
         appendLog(ts + ' ' + (flags.isEmpty() ? QString() : flags + ' ') + text); });
     connect(&omi_, &ManagementClient::byteCount, this, [this](quint64 in, quint64 out)
             {
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        if (!traffic_.isEmpty() || bytesIn_ || bytesOut_)
+        {
+            const qint64 last = traffic_.isEmpty() ? now - 2000 : traffic_.last().time;
+            const double secs = qMax<qint64>(now - last, 1) / 1000.0;
+            // counters restart from zero after a reconnect
+            const double din = in >= bytesIn_ ? double(in - bytesIn_) : double(in);
+            const double dout = out >= bytesOut_ ? double(out - bytesOut_) : double(out);
+            traffic_.append({now, din / secs, dout / secs});
+            while (traffic_.size() > maxTrafficSamples)
+                traffic_.removeFirst();
+        }
+        else
+            traffic_.append({now, 0, 0});
         bytesIn_ = in;
         bytesOut_ = out;
         emit statsChanged(); });
@@ -116,7 +132,23 @@ Connection::Connection(const QString &name, const QString &configPath, QObject *
     connect(&omi_, &ManagementClient::fatal, this, [this](const QString &message)
             {
         fatalError_ = message;
-        appendLog(tr("FATAL: %1").arg(message)); });
+        appendLog(tr("FATAL: %1").arg(message));
+        // every simultaneous connection needs an adapter of its own
+        if (message.contains("cannot acquire TAP handle"))
+        {
+            fatalError_ = tr("All VPN adapters are in use. Each simultaneous connection needs its own adapter; "
+                             "add one from an elevated prompt, e.g. with \"tapctl create --hwid ovpn-dco\" "
+                             "from OpenVPN Community.");
+            appendLog(fatalError_);
+        }
+        // the agent refused a second tunnel taking over the default route,
+        // e.g. because the server pushed redirect-gateway
+        else if (message.contains("redirect-gateway: the default gateway is already redirected"))
+        {
+            fatalError_ = tr("Another connection already redirects all traffic (redirect-gateway). "
+                             "Only one connection can be the default route; disconnect the other one first.");
+            appendLog(fatalError_);
+        } });
     connect(&omi_, &ManagementClient::notify, this, [this](const QString &message)
             { appendLog(tr("NOTIFY: %1").arg(message)); });
     connect(&omi_, &ManagementClient::commandError, this, [this](const QString &message)
@@ -167,7 +199,25 @@ bool Connection::redirectsGateway() const
     return re.match(QString::fromUtf8(f.readAll())).hasMatch();
 }
 
-void Connection::start(const QString &workerPath, const QString &logDir)
+QString Connection::logFile(const QString &logDir, const QString &profile)
+{
+    return QDir(logDir).filePath(fileSafe(profile) + ".log");
+}
+
+// keep the logs of the last sessions: name.log -> name.1.log -> ... -> name.5.log
+static void rotateLogs(const QString &logFile)
+{
+    QString base = logFile;
+    base.chop(4); // ".log"
+    auto numbered = [&base](int n)
+    { return base + '.' + QString::number(n) + ".log"; };
+    QFile::remove(numbered(Connection::keptLogs));
+    for (int n = Connection::keptLogs - 1; n >= 1; --n)
+        QFile::rename(numbered(n), numbered(n + 1));
+    QFile::rename(logFile, numbered(1));
+}
+
+void Connection::start(const QString &workerPath, const QString &logDir, const ProxySettings &proxy)
 {
     if (isActive())
         return;
@@ -204,12 +254,14 @@ void Connection::start(const QString &workerPath, const QString &logDir)
     fatalError_.clear();
     dynamicChallenge_.clear();
     bytesIn_ = bytesOut_ = 0;
+    traffic_.clear();
     omiState_ = OmiState();
     connectedSince_ = QDateTime();
     emit statsChanged();
 
     QDir().mkpath(logDir);
-    const QString logFile = QDir(logDir).filePath(fileSafe(name_) + ".log");
+    const QString logFile = Connection::logFile(logDir, name_);
+    rotateLogs(logFile);
 
     closeExitEvent();
     exitEventName_ = "ovpn3-gui-" + QUuid::createUuid().toString(QUuid::WithoutBraces);
@@ -222,12 +274,18 @@ void Connection::start(const QString &workerPath, const QString &logDir)
 
     process_ = new QProcess(this);
     process_->setProgram(workerPath);
-    process_->setArguments({"--config", QDir::toNativeSeparators(configPath_),
-                            "--management", "127.0.0.1", QString::number(port), "stdin",
-                            "--management-query-passwords",
-                            "--management-hold",
-                            "--exit-event-name", exitEventName_,
-                            "--log", QDir::toNativeSeparators(logFile)});
+    QStringList args{"--config", QDir::toNativeSeparators(configPath_),
+                     "--management", "127.0.0.1", QString::number(port), "stdin",
+                     "--management-query-passwords",
+                     "--management-hold",
+                     "--exit-event-name", exitEventName_,
+                     "--log", QDir::toNativeSeparators(logFile)};
+    if (!proxy.host.isEmpty() && proxy.port)
+    {
+        // overrides any http-proxy of the profile; credentials are asked for when needed
+        args << "--http-proxy-override" << proxy.host << QString::number(proxy.port);
+    }
+    process_->setArguments(args);
     process_->setWorkingDirectory(QFileInfo(configPath_).absolutePath());
     process_->setProcessChannelMode(QProcess::MergedChannels);
     connect(process_, &QProcess::readyRead, process_, [p = process_]()
@@ -244,6 +302,8 @@ void Connection::start(const QString &workerPath, const QString &logDir)
 
     log_.clear();
     appendLog(tr("Starting %1").arg(QDir::toNativeSeparators(workerPath)));
+    if (!proxy.host.isEmpty() && proxy.port)
+        appendLog(tr("Using HTTP proxy %1:%2").arg(proxy.host).arg(proxy.port));
     setState(State::Connecting, tr("Starting worker"));
 
     process_->start();

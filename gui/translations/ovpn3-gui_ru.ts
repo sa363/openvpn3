@@ -146,6 +146,18 @@
             <source>%1: %2</source>
             <translation>%1: %2</translation>
         </message>
+        <message>
+            <source>All VPN adapters are in use. Each simultaneous connection needs its own adapter; add one from an elevated prompt, e.g. with "tapctl create --hwid ovpn-dco" from OpenVPN Community.</source>
+            <translation>Все VPN-адаптеры заняты. Каждому одновременному подключению нужен свой адаптер; добавьте его из командной строки администратора, например командой "tapctl create --hwid ovpn-dco" из OpenVPN Community.</translation>
+        </message>
+        <message>
+            <source>Another connection already redirects all traffic (redirect-gateway). Only one connection can be the default route; disconnect the other one first.</source>
+            <translation>Весь трафик уже перенаправляет другое подключение (redirect-gateway). Маршрутом по умолчанию может быть только одно подключение; сначала отключите другое.</translation>
+        </message>
+        <message>
+            <source>Using HTTP proxy %1:%2</source>
+            <translation>Используется HTTP-прокси %1:%2</translation>
+        </message>
     </context>
     <context>
         <name>ConnectionManager</name>
@@ -254,6 +266,30 @@
             <source>omicliagent.exe sets up tunnels through the ovpnagent service and needs no administrator rights. omicli.exe works without the service but the GUI must then run as administrator.</source>
             <translation>omicliagent.exe настраивает туннели через службу ovpnagent и не требует прав администратора. omicli.exe работает без службы, но тогда GUI нужно запускать от имени администратора.</translation>
         </message>
+        <message>
+            <source>Connect through an HTTP proxy</source>
+            <translation>Подключаться через HTTP-прокси</translation>
+        </message>
+        <message>
+            <source>proxy.example.com</source>
+            <translation>proxy.example.com</translation>
+        </message>
+        <message>
+            <source>Port:</source>
+            <translation>Порт:</translation>
+        </message>
+        <message>
+            <source>Proxy:</source>
+            <translation>Прокси:</translation>
+        </message>
+        <message>
+            <source>Used for all connections instead of the http-proxy of the profiles. Proxy credentials are asked for when the proxy needs them. Connections through a proxy don't use ovpn-dco-win.</source>
+            <translation>Используется для всех подключений вместо http-proxy из профилей. Логин и пароль прокси запрашиваются, если прокси их требует. Подключения через прокси не используют ovpn-dco-win.</translation>
+        </message>
+        <message>
+            <source>Enter the proxy host name or address.</source>
+            <translation>Укажите имя или адрес прокси-сервера.</translation>
+        </message>
     </context>
     <context>
         <name>StatusWindow</name>
@@ -301,6 +337,29 @@
             <source>in %1, out %2</source>
             <translation>вх. %1, исх. %2</translation>
         </message>
+        <message>
+            <source>Log files</source>
+            <translation>Файлы журнала</translation>
+        </message>
+        <message>
+            <source>Open the folder with the logs of this and the earlier sessions</source>
+            <translation>Открыть папку с журналами этого и предыдущих сеансов</translation>
+        </message>
+    </context>
+    <context>
+        <name>TrafficGraph</name>
+        <message>
+            <source>in %1</source>
+            <translation>вх. %1</translation>
+        </message>
+        <message>
+            <source>out %1</source>
+            <translation>исх. %1</translation>
+        </message>
+        <message>
+            <source>%1, last 5 min</source>
+            <translation>%1, последние 5 мин</translation>
+        </message>
     </context>
     <context>
         <name>TrayController</name>
@@ -315,10 +374,6 @@
         <message>
             <source>Disconnect "%1"</source>
             <translation>Отключить «%1»</translation>
-        </message>
-        <message>
-            <source>Connect anyway</source>
-            <translation>Всё равно подключить</translation>
         </message>
         <message>
             <source>Import profile</source>

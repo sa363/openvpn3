@@ -17,6 +17,8 @@ const char keyWorkerPath[] = "workerPath";
 const char keyAutoConnect[] = "autoConnect";
 const char keyUsernames[] = "usernames/";
 const char keyPasswords[] = "passwords/";
+const char keyProxyHost[] = "proxy/host";
+const char keyProxyPort[] = "proxy/port";
 
 QString defaultConfigDir()
 {
@@ -65,6 +67,28 @@ void ConnectionManager::setWorkerPath(const QString &path)
 QString ConnectionManager::logDir() const
 {
     return QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)).filePath("logs");
+}
+
+ProxySettings ConnectionManager::proxy() const
+{
+    QSettings s;
+    ProxySettings p;
+    p.host = s.value(keyProxyHost).toString();
+    p.port = static_cast<quint16>(s.value(keyProxyPort, 0).toUInt());
+    return p;
+}
+
+void ConnectionManager::setProxy(const ProxySettings &proxy)
+{
+    QSettings s;
+    if (proxy.host.isEmpty() || !proxy.port)
+    {
+        s.remove(keyProxyHost);
+        s.remove(keyProxyPort);
+        return;
+    }
+    s.setValue(keyProxyHost, proxy.host);
+    s.setValue(keyProxyPort, proxy.port);
 }
 
 QStringList ConnectionManager::autoConnectProfiles() const
@@ -215,7 +239,7 @@ bool ConnectionManager::canConnect(Connection *c, QString *conflict) const
 
 void ConnectionManager::connectProfile(Connection *c)
 {
-    c->start(workerPath(), logDir());
+    c->start(workerPath(), logDir(), proxy());
 }
 
 void ConnectionManager::disconnectAll()

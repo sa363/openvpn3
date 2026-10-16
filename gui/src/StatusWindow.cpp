@@ -3,6 +3,7 @@
 #include "Connection.h"
 #include "ConnectionManager.h"
 #include "Icons.h"
+#include "TrafficGraph.h"
 
 #include <QClipboard>
 #include <QDesktopServices>
@@ -59,6 +60,8 @@ StatusWindow::StatusWindow(ConnectionManager *manager, Connection *connection, Q
     form->addRow(tr("Connected for:"), duration_);
     layout->addLayout(form);
 
+    layout->addWidget(new TrafficGraph(connection_));
+
     log_ = new QPlainTextEdit;
     log_->setReadOnly(true);
     log_->setMaximumBlockCount(5000);
@@ -73,11 +76,14 @@ StatusWindow::StatusWindow(ConnectionManager *manager, Connection *connection, Q
     disconnect_ = new QPushButton(tr("Disconnect"));
     auto *copyLog = new QPushButton(tr("Copy log"));
     auto *editConfig = new QPushButton(tr("Edit profile"));
+    auto *logFiles = new QPushButton(tr("Log files"));
+    logFiles->setToolTip(tr("Open the folder with the logs of this and the earlier sessions"));
     auto *close = new QPushButton(tr("Hide"));
     buttons->addWidget(connect_);
     buttons->addWidget(disconnect_);
     buttons->addStretch();
     buttons->addWidget(copyLog);
+    buttons->addWidget(logFiles);
     buttons->addWidget(editConfig);
     buttons->addWidget(close);
     layout->addLayout(buttons);
@@ -87,6 +93,10 @@ StatusWindow::StatusWindow(ConnectionManager *manager, Connection *connection, Q
     connect(disconnect_, &QPushButton::clicked, connection_, &Connection::stop);
     connect(copyLog, &QPushButton::clicked, this, [this]()
             { QGuiApplication::clipboard()->setText(connection_->log().join('\n')); });
+    connect(logFiles, &QPushButton::clicked, this, [this]()
+            {
+        QDir().mkpath(manager_->logDir());
+        QDesktopServices::openUrl(QUrl::fromLocalFile(manager_->logDir())); });
     connect(editConfig, &QPushButton::clicked, this, [this]()
             {
         // .ovpn files may be associated with another VPN client, so use an editor

@@ -29,6 +29,8 @@ qt_add_executable(ovpn3-gui WIN32
     src/SettingsDialog.h
     src/StatusWindow.cpp
     src/StatusWindow.h
+    src/TrafficGraph.cpp
+    src/TrafficGraph.h
     src/TrayController.cpp
     src/TrayController.h
 )
