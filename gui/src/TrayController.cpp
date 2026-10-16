@@ -236,6 +236,25 @@ void TrayController::watch(Connection *c)
             {
         if (type == "Auth")
             manager_->setSavedPassword(c->name(), QString()); });
+    connect(c, &Connection::routeConflicts, this, [this, c](qint64 otherPid, const QStringList &overlaps)
+            {
+        QString other;
+        for (const Connection *o : manager_->connections())
+            if (otherPid && o->workerPid() == otherPid)
+                other = o->name();
+        if (otherPid == 0)
+            return; // only the count of further ones, the others were reported
+        QStringList shown = overlaps.mid(0, 3);
+        if (overlaps.size() > shown.size())
+            shown << tr("and %n more", nullptr, int(overlaps.size() - shown.size()));
+        const QString message = other.isEmpty()
+                                    ? tr("Routes of \"%1\" overlap routes of another connection:\n%2\n"
+                                         "Traffic to these networks may go through either tunnel.")
+                                          .arg(c->name(), shown.join('\n'))
+                                    : tr("Routes of \"%1\" overlap routes of \"%2\":\n%3\n"
+                                         "Traffic to these networks may go through either tunnel.")
+                                          .arg(c->name(), other, shown.join('\n'));
+        tray_.showMessage(tr("Overlapping routes"), message, QSystemTrayIcon::Warning); });
     connect(c, &Connection::errorOccurred, this, [this](const QString &message)
             { tray_.showMessage(tr("OpenVPN3"), message, QSystemTrayIcon::Warning); });
 }

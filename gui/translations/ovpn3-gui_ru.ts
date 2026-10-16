@@ -467,5 +467,33 @@ Open it now?</source>
             <source>%1 is connected, address %2</source>
             <translation>%1 подключено, адрес %2</translation>
         </message>
+        <message numerus="yes">
+            <source>and %n more</source>
+            <translation>
+                <numerusform>и ещё %n</numerusform>
+                <numerusform>и ещё %n</numerusform>
+                <numerusform>и ещё %n</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Routes of "%1" overlap routes of another connection:
+%2
+Traffic to these networks may go through either tunnel.</source>
+            <translation>Маршруты «%1» пересекаются с маршрутами другого подключения:
+%2
+Трафик в эти сети может пойти через любой из туннелей.</translation>
+        </message>
+        <message>
+            <source>Routes of "%1" overlap routes of "%2":
+%3
+Traffic to these networks may go through either tunnel.</source>
+            <translation>Маршруты «%1» пересекаются с маршрутами «%2»:
+%3
+Трафик в эти сети может пойти через любой из туннелей.</translation>
+        </message>
+        <message>
+            <source>Overlapping routes</source>
+            <translation>Пересекающиеся маршруты</translation>
+        </message>
     </context>
 </TS>
