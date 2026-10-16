@@ -78,6 +78,7 @@ Connection::Connection(const QString &name, const QString &configPath, QObject *
             killWorker();
         } });
 
+    connect(&omi_, &ManagementClient::logContinuation, this, &Connection::appendLog);
     connect(&omi_, &ManagementClient::ready, this, [this]()
             { appendLog(tr("Management interface connected")); });
     connect(&omi_, &ManagementClient::connectFailed, this, [this](const QString &reason)
@@ -424,6 +425,8 @@ void Connection::onOmiState(const OmiState &st)
 void Connection::onProcessFinished(int exitCode, QProcess::ExitStatus status)
 {
     stopTimer_.stop();
+    // an error the worker sent without a >FATAL prefix right before exiting
+    const QString lastPlain = omi_.lastPlainLine();
     omi_.disconnectFromWorker();
     closeExitEvent();
 
@@ -440,9 +443,11 @@ void Connection::onProcessFinished(int exitCode, QProcess::ExitStatus status)
         setState(State::Disconnected);
     else
     {
-        const QString reason = fatalError_.isEmpty()
-                                   ? (status == QProcess::CrashExit ? tr("Worker crashed") : tr("Worker exited unexpectedly"))
-                                   : fatalError_;
+        QString reason = fatalError_;
+        if (reason.isEmpty())
+            reason = lastPlain;
+        if (reason.isEmpty())
+            reason = status == QProcess::CrashExit ? tr("Worker crashed") : tr("Worker exited unexpectedly");
         setState(State::Failed, reason);
         emit errorOccurred(tr("%1: %2").arg(name_, reason));
     }

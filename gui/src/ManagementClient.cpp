@@ -36,6 +36,7 @@ void ManagementClient::connectToWorker(quint16 port, const QByteArray &password,
     disconnectFromWorker();
     port_ = port;
     password_ = password;
+    lastPlainLine_.clear();
     deadline_ = QDateTime::currentMSecsSinceEpoch() + timeoutMs;
     tryConnect();
 }
@@ -134,6 +135,7 @@ void ManagementClient::processLine(const QString &line)
 {
     if (line.startsWith('>'))
     {
+        lastPlainLine_.clear();
         const qsizetype colon = line.indexOf(':');
         if (colon < 0)
             return;
@@ -152,10 +154,15 @@ void ManagementClient::processLine(const QString &line)
 
     if (pendingHistory_.isEmpty())
     {
-        // outside of a history dump the worker sends its final error
-        // unprefixed, e.g. when the profile or a file it refers to can't be read
-        if (!line.trimmed().isEmpty())
-            emit fatal(line.trimmed());
+        // Outside of a history dump these are the further lines of a
+        // multi-line >LOG message, or the final error the worker sends
+        // before it exits, e.g. when a file of the profile can't be read.
+        const QString text = line.trimmed();
+        if (!text.isEmpty())
+        {
+            lastPlainLine_ = text;
+            emit logContinuation(line);
+        }
         return;
     }
 
