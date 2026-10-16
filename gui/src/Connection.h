@@ -100,12 +100,38 @@ class Connection : public QObject
 
     static QString stateText(State state);
 
+    // Connect on behalf of the user: the connection is wanted until stop(),
+    // and with auto reconnect it is started again after it failed.
     void start(const QString &workerPath, const QString &logDir, const ProxySettings &proxy = ProxySettings());
+    // disconnect because the GUI exits; the connection stays wanted
+    void shutdown();
+    // set up the tunnel again, e.g. after the agent was restarted
+    void reconnectTunnel();
+
+    bool isWanted() const
+    {
+        return wanted_;
+    }
+    void setAutoReconnect(bool enabled)
+    {
+        autoReconnect_ = enabled;
+    }
+    bool isWaitingForRetry() const
+    {
+        return retryTimer_.isActive();
+    }
+    void retryNow();
+
+    // the worker sets up tunnels through the ovpnagent service
+    static bool workerNeedsAgent(const QString &workerPath);
+    // the ovpnagent service serves its named pipe
+    static bool agentRunning();
 
     // how many logs of earlier sessions are kept per profile
     static constexpr int keptLogs = 5;
     // file of the current session's log, the earlier ones are <name>.1.log ... <name>.5.log
     static QString logFile(const QString &logDir, const QString &profile);
+    // disconnect on behalf of the user
     void stop();
 
     // answers to passwordNeeded()
@@ -123,6 +149,8 @@ class Connection : public QObject
     void credentialsNeeded(const OmiPasswordRequest &request, const QString &dynamicChallenge);
     void webAuthRequested(const QString &url);
     void errorOccurred(const QString &message);
+    // the user connected or disconnected, or the connection failed for good
+    void wantedChanged(bool wanted);
     // the server rejected the credentials (not a dynamic challenge)
     void authenticationFailed(const QString &type);
     // Routes of this tunnel overlap routes of the tunnel of another worker:
@@ -136,6 +164,11 @@ class Connection : public QObject
     void checkRouteConflict(const QString &text);
     void onOmiState(const OmiState &st);
     void onProcessFinished(int exitCode, QProcess::ExitStatus status);
+    void launch();
+    void stopWorker();
+    void setWanted(bool wanted);
+    // retry later if the connection is wanted and the error may go away
+    void fail(const QString &reason, const QString &detail, bool permanent);
     void killWorker();
     void signalExitEvent();
     void closeExitEvent();
@@ -163,6 +196,21 @@ class Connection : public QObject
     // CRV1 challenge from the last auth failure, answered with the next
     // password request
     QString dynamicChallenge_;
+
+    // the user wants the connection up, see start() and stop()
+    bool wanted_ = false;
+    bool autoReconnect_ = true;
+    // stop() or shutdown() asked the worker to exit
+    bool stopRequested_ = false;
+    int retries_ = 0;
+    QTimer retryTimer_;
+    QString workerPath_;
+    QString logDir_;
+    ProxySettings proxy_;
+    // the error as the worker sent it, fatalError_ may be a friendlier text
+    QString fatalRaw_;
+    // reason of a halt pushed by the server
+    QString haltReason_;
 
     QString exitEventName_;
     void *exitEvent_ = nullptr; // HANDLE

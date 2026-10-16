@@ -20,6 +20,8 @@ class SettingsDialog : public QDialog
     ConnectionManager *manager_;
     QLineEdit *configDir_ = nullptr;
     QLineEdit *workerPath_ = nullptr;
+    QCheckBox *autoReconnect_ = nullptr;
+    QCheckBox *restoreOnStartup_ = nullptr;
     QCheckBox *useProxy_ = nullptr;
     QLineEdit *proxyHost_ = nullptr;
     QSpinBox *proxyPort_ = nullptr;

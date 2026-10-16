@@ -17,6 +17,9 @@ const char keyWorkerPath[] = "workerPath";
 const char keyAutoConnect[] = "autoConnect";
 const char keyUsernames[] = "usernames/";
 const char keyPasswords[] = "passwords/";
+const char keyRestore[] = "restore";
+const char keyAutoReconnect[] = "autoReconnect";
+const char keyRestoreOnStartup[] = "restoreOnStartup";
 const char keyProxyHost[] = "proxy/host";
 const char keyProxyPort[] = "proxy/port";
 
@@ -41,6 +44,64 @@ QString profileKey(QString name)
 ConnectionManager::ConnectionManager(QObject *parent)
     : QObject(parent)
 {
+    agentWasRunning_ = Connection::agentRunning();
+    agentTimer_.setInterval(3000);
+    connect(&agentTimer_, &QTimer::timeout, this, &ConnectionManager::watchAgent);
+    agentTimer_.start();
+}
+
+bool ConnectionManager::autoReconnect() const
+{
+    return QSettings().value(keyAutoReconnect, true).toBool();
+}
+
+void ConnectionManager::setAutoReconnect(bool enabled)
+{
+    QSettings().setValue(keyAutoReconnect, enabled);
+    for (Connection *c : connections_)
+        c->setAutoReconnect(enabled);
+}
+
+bool ConnectionManager::restoreOnStartup() const
+{
+    return QSettings().value(keyRestoreOnStartup, true).toBool();
+}
+
+void ConnectionManager::setRestoreOnStartup(bool enabled)
+{
+    QSettings().setValue(keyRestoreOnStartup, enabled);
+}
+
+// Profiles that are wanted up. Only the user and permanent failures remove
+// them, not exiting the GUI, so they come back with the next start.
+void ConnectionManager::rememberWanted(const QString &name, bool wanted)
+{
+    QSettings s;
+    QStringList list = s.value(keyRestore).toStringList();
+    list.removeAll(name);
+    if (wanted)
+        list.append(name);
+    s.setValue(keyRestore, list);
+}
+
+void ConnectionManager::watchAgent()
+{
+    if (!Connection::workerNeedsAgent(workerPath()))
+        return;
+    const bool running = Connection::agentRunning();
+    if (running && !agentWasRunning_)
+    {
+        // The service came back: its tunnels were torn down when it stopped,
+        // so set them up again, and don't keep waiting connections waiting.
+        for (Connection *c : connections_)
+        {
+            if (c->isWaitingForRetry())
+                c->retryNow();
+            else if (c->isActive())
+                c->reconnectTunnel();
+        }
+    }
+    agentWasRunning_ = running;
 }
 
 QString ConnectionManager::configDir() const
@@ -249,9 +310,23 @@ void ConnectionManager::disconnectAll()
             c->stop();
 }
 
+void ConnectionManager::shutdownAll()
+{
+    for (Connection *c : connections_)
+        if (c->isActive())
+            c->shutdown();
+}
+
 void ConnectionManager::startAutoConnect()
 {
-    for (const QString &name : autoConnectProfiles())
+    QStringList names = autoConnectProfiles();
+    if (restoreOnStartup())
+    {
+        for (const QString &name : QSettings().value(keyRestore).toStringList())
+            if (!names.contains(name))
+                names.append(name);
+    }
+    for (const QString &name : names)
     {
         Connection *c = find(name);
         QString conflict;
@@ -263,6 +338,9 @@ void ConnectionManager::startAutoConnect()
 void ConnectionManager::add(Connection *c)
 {
     connections_.append(c);
+    c->setAutoReconnect(autoReconnect());
+    connect(c, &Connection::wantedChanged, this, [this, c](bool wanted)
+            { rememberWanted(c->name(), wanted); });
     connect(c, &Connection::stateChanged, this, [this, c]()
             { emit connectionStateChanged(c); });
 }

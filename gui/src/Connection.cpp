@@ -44,13 +44,64 @@ QString fileSafe(QString s)
     return s.replace(bad, "_");
 }
 
-// omicliagent sets up the tunnel through the ovpnagent service
-bool workerNeedsAgent(const QString &workerPath)
+// 5, 10, 20, 40 and then 60 seconds between attempts
+int retryDelaySeconds(int retries)
+{
+    return qMin(5 << qMin(retries, 4), 60);
+}
+
+// errors that another attempt won't fix
+bool isPermanentError(const QString &error)
+{
+    static const char *const permanent[] = {
+        "merge_error",                                           // profile or a file it refers to
+        "eval config error",                                     // profile
+        "ERR_INVALID_CONFIG",                                    // profile
+        "auth-failure",                                          // credentials of the profile
+        "redirect-gateway: the default gateway is already redirected", // agent refused
+    };
+    for (const char *p : permanent)
+        if (error.contains(QLatin1String(p)))
+            return true;
+    return false;
+}
+
+#ifdef Q_OS_WIN
+// Workers are killed together with the GUI, also when it crashes or is
+// terminated, e.g. by an installer. Otherwise they would stay up unseen and
+// the next GUI instance would start the same connections again.
+void assignToWorkerJob(qint64 pid)
+{
+    static const HANDLE job = []()
+    {
+        const HANDLE j = ::CreateJobObjectW(nullptr, nullptr);
+        if (j)
+        {
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION info{};
+            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            ::SetInformationJobObject(j, JobObjectExtendedLimitInformation, &info, sizeof(info));
+        }
+        return j;
+    }();
+    if (!job)
+        return;
+    const HANDLE proc = ::OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, static_cast<DWORD>(pid));
+    if (proc)
+    {
+        ::AssignProcessToJobObject(job, proc);
+        ::CloseHandle(proc);
+    }
+}
+#endif
+
+} // namespace
+
+bool Connection::workerNeedsAgent(const QString &workerPath)
 {
     return QFileInfo(workerPath).baseName().compare("omicliagent", Qt::CaseInsensitive) == 0;
 }
 
-bool agentRunning()
+bool Connection::agentRunning()
 {
 #ifdef Q_OS_WIN
     // fails with ERROR_FILE_NOT_FOUND if nobody serves the pipe,
@@ -62,8 +113,6 @@ bool agentRunning()
     return true;
 #endif
 }
-
-} // namespace
 
 Connection::Connection(const QString &name, const QString &configPath, QObject *parent)
     : QObject(parent),
@@ -79,6 +128,9 @@ Connection::Connection(const QString &name, const QString &configPath, QObject *
             appendLog(tr("Worker did not stop in time, terminating it"));
             killWorker();
         } });
+
+    retryTimer_.setSingleShot(true);
+    connect(&retryTimer_, &QTimer::timeout, this, &Connection::launch);
 
     conflictTimer_.setSingleShot(true);
     conflictTimer_.setInterval(500);
@@ -147,6 +199,7 @@ Connection::Connection(const QString &name, const QString &configPath, QObject *
     connect(&omi_, &ManagementClient::fatal, this, [this](const QString &message)
             {
         fatalError_ = message;
+        fatalRaw_ = message;
         appendLog(tr("FATAL: %1").arg(message));
         // every simultaneous connection needs an adapter of its own
         if (message.contains("cannot acquire TAP handle"))
@@ -167,7 +220,11 @@ Connection::Connection(const QString &name, const QString &configPath, QObject *
             appendLog(fatalError_);
         } });
     connect(&omi_, &ManagementClient::notify, this, [this](const QString &message)
-            { appendLog(tr("NOTIFY: %1").arg(message)); });
+            {
+        appendLog(tr("NOTIFY: %1").arg(message));
+        static const QString halt = QStringLiteral("info,server-pushed-halt,");
+        if (message.startsWith(halt))
+            haltReason_ = message.mid(halt.size()).trimmed(); });
     connect(&omi_, &ManagementClient::commandError, this, [this](const QString &message)
             { appendLog(tr("Management error: %1").arg(message)); });
 }
@@ -257,24 +314,48 @@ void Connection::start(const QString &workerPath, const QString &logDir, const P
 {
     if (isActive())
         return;
+    workerPath_ = workerPath;
+    logDir_ = logDir;
+    proxy_ = proxy;
+    retries_ = 0;
+    setWanted(true);
+    launch();
+}
+
+void Connection::retryNow()
+{
+    if (retryTimer_.isActive())
+    {
+        retryTimer_.stop();
+        launch();
+    }
+}
+
+void Connection::launch()
+{
+    const QString &workerPath = workerPath_;
+    const QString &logDir = logDir_;
+    const ProxySettings &proxy = proxy_;
+    stopRequested_ = false;
+    fatalRaw_.clear();
+    haltReason_.clear();
 
     if (!QFileInfo(workerPath).isExecutable())
     {
         fatalError_ = tr("Worker not found: %1").arg(QDir::toNativeSeparators(workerPath));
         appendLog(fatalError_);
-        setState(State::Failed, fatalError_);
-        emit errorOccurred(fatalError_);
+        fail(fatalError_, fatalError_, true);
         return;
     }
 
     if (workerNeedsAgent(workerPath) && !agentRunning())
     {
+        // the service may just be restarting, so this is worth another attempt
         fatalError_ = tr("The ovpnagent service is not running. Start it from an elevated prompt with "
                          "\"ovpnagent.exe install\" or \"ovpnagent.exe run\", or select omicli.exe in "
                          "Settings and run the GUI as administrator.");
         appendLog(fatalError_);
-        setState(State::Failed, tr("ovpnagent service is not running"));
-        emit errorOccurred(fatalError_);
+        fail(fatalError_, tr("ovpnagent service is not running"), false);
         return;
     }
 
@@ -282,8 +363,7 @@ void Connection::start(const QString &workerPath, const QString &logDir, const P
     if (!port)
     {
         fatalError_ = tr("No free port for the management interface");
-        setState(State::Failed, fatalError_);
-        emit errorOccurred(fatalError_);
+        fail(fatalError_, fatalError_, false);
         return;
     }
 
@@ -327,11 +407,18 @@ void Connection::start(const QString &workerPath, const QString &logDir, const P
     connect(process_, &QProcess::readyRead, process_, [p = process_]()
             { p->readAll(); }); // everything useful goes to --log and the OMI
     connect(process_, &QProcess::finished, this, &Connection::onProcessFinished);
+#ifdef Q_OS_WIN
+    connect(process_, &QProcess::started, this, [this]()
+            {
+        if (process_)
+            assignToWorkerJob(process_->processId()); });
+#endif
     connect(process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError err)
             {
         if (err == QProcess::FailedToStart)
         {
             fatalError_ = tr("Cannot start worker: %1").arg(process_->errorString());
+            fatalRaw_ = QStringLiteral("eval config error"); // permanent: don't retry
             appendLog(fatalError_);
             onProcessFinished(-1, QProcess::CrashExit);
         } });
@@ -352,14 +439,63 @@ void Connection::start(const QString &workerPath, const QString &logDir, const P
 
 void Connection::stop()
 {
+    setWanted(false);
+    stopWorker();
+}
+
+void Connection::shutdown()
+{
+    stopWorker();
+}
+
+void Connection::reconnectTunnel()
+{
+    if (omi_.isReady())
+    {
+        appendLog(tr("Setting up the tunnel again"));
+        omi_.restart();
+    }
+}
+
+void Connection::setWanted(bool wanted)
+{
+    if (wanted_ == wanted)
+        return;
+    wanted_ = wanted;
+    emit wantedChanged(wanted);
+}
+
+void Connection::fail(const QString &reason, const QString &detail, bool permanent)
+{
+    if (wanted_ && autoReconnect_ && !permanent)
+    {
+        const int delay = retryDelaySeconds(retries_++);
+        appendLog(tr("Connecting again in %1 s").arg(delay));
+        setState(State::Reconnecting, tr("next attempt in %1 s: %2").arg(delay).arg(detail));
+        // tell once, not for every attempt
+        if (retries_ == 1)
+            emit errorOccurred(tr("%1: %2. Connecting again.").arg(name_, reason));
+        retryTimer_.start(delay * 1000);
+        return;
+    }
+    setWanted(false);
+    setState(State::Failed, detail);
+    emit errorOccurred(tr("%1: %2").arg(name_, reason));
+}
+
+void Connection::stopWorker()
+{
+    retryTimer_.stop();
+    retries_ = 0;
     if (!process_ || process_->state() == QProcess::NotRunning)
     {
         setState(State::Disconnected);
         return;
     }
-    if (state_ == State::Disconnecting)
+    if (state_ == State::Disconnecting && stopRequested_)
         return;
 
+    stopRequested_ = true;
     setState(State::Disconnecting);
     if (omi_.isReady())
         omi_.terminate();
@@ -444,7 +580,10 @@ void Connection::onOmiState(const OmiState &st)
 
     omiState_ = st;
     if (st.name == "CONNECTED")
+    {
+        retries_ = 0;
         setState(State::Connected, st.localIp);
+    }
     else if (st.name == "RECONNECTING")
         setState(State::Reconnecting, st.detail);
     else if (st.name == "EXITING")
@@ -463,7 +602,10 @@ void Connection::onProcessFinished(int exitCode, QProcess::ExitStatus status)
     omi_.disconnectFromWorker();
     closeExitEvent();
 
-    const bool requested = state_ == State::Disconnecting;
+    // the worker also goes to EXITING by itself, e.g. on a halt pushed by
+    // the server, so only stop() and shutdown() count as requested
+    const bool requested = stopRequested_;
+    stopRequested_ = false;
     appendLog(tr("Worker exited (code %1)").arg(exitCode));
 
     if (process_)
@@ -472,18 +614,27 @@ void Connection::onProcessFinished(int exitCode, QProcess::ExitStatus status)
         process_ = nullptr;
     }
 
-    if (requested && fatalError_.isEmpty())
-        setState(State::Disconnected);
-    else
+    if (requested)
     {
-        QString reason = fatalError_;
-        if (reason.isEmpty())
-            reason = lastPlain;
-        if (reason.isEmpty())
-            reason = status == QProcess::CrashExit ? tr("Worker crashed") : tr("Worker exited unexpectedly");
-        setState(State::Failed, reason);
-        emit errorOccurred(tr("%1: %2").arg(name_, reason));
+        if (fatalError_.isEmpty())
+            setState(State::Disconnected);
+        else
+        {
+            setState(State::Failed, fatalError_);
+            emit errorOccurred(tr("%1: %2").arg(name_, fatalError_));
+        }
+        return;
     }
+
+    QString reason = fatalError_;
+    if (reason.isEmpty() && !haltReason_.isEmpty())
+        reason = tr("The server disconnected the client: %1").arg(haltReason_);
+    if (reason.isEmpty())
+        reason = lastPlain;
+    if (reason.isEmpty())
+        reason = status == QProcess::CrashExit ? tr("Worker crashed") : tr("Worker exited unexpectedly");
+    const QString raw = fatalRaw_.isEmpty() ? lastPlain : fatalRaw_;
+    fail(reason, reason, isPermanentError(raw));
 }
 
 void Connection::killWorker()

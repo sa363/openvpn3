@@ -158,6 +158,26 @@
             <source>No free VPN adapter for this connection: all adapters of the needed driver (ovpn-dco, TAP or Wintun) are in use or none is installed. Each simultaneous connection needs its own adapter; add one from an elevated prompt, e.g. with "tapctl create --hwid ovpn-dco" from OpenVPN Community. The worker log shows which driver was used.</source>
             <translation>Нет свободного VPN-адаптера для этого подключения: все адаптеры нужного драйвера (ovpn-dco, TAP или Wintun) заняты или не установлены. Каждому одновременному подключению нужен свой адаптер; добавьте его из командной строки администратора, например командой "tapctl create --hwid ovpn-dco" из OpenVPN Community. Какой драйвер использовался, видно в журнале рабочего процесса.</translation>
         </message>
+        <message>
+            <source>Setting up the tunnel again</source>
+            <translation>Повторная настройка туннеля</translation>
+        </message>
+        <message>
+            <source>Connecting again in %1 s</source>
+            <translation>Повторное подключение через %1 с</translation>
+        </message>
+        <message>
+            <source>next attempt in %1 s: %2</source>
+            <translation>следующая попытка через %1 с: %2</translation>
+        </message>
+        <message>
+            <source>%1: %2. Connecting again.</source>
+            <translation>%1: %2. Подключаюсь снова.</translation>
+        </message>
+        <message>
+            <source>The server disconnected the client: %1</source>
+            <translation>Сервер отключил клиента: %1</translation>
+        </message>
     </context>
     <context>
         <name>ConnectionManager</name>
@@ -289,6 +309,22 @@
         <message>
             <source>Enter the proxy host name or address.</source>
             <translation>Укажите имя или адрес прокси-сервера.</translation>
+        </message>
+        <message>
+            <source>Connect again when a connection fails</source>
+            <translation>Переподключаться при сбое подключения</translation>
+        </message>
+        <message>
+            <source>Waits 5 s after the first failure and up to 60 s after further ones</source>
+            <translation>Ждёт 5 с после первого сбоя и до 60 с после следующих</translation>
+        </message>
+        <message>
+            <source>Restore the connections at startup</source>
+            <translation>Восстанавливать подключения при запуске</translation>
+        </message>
+        <message>
+            <source>Connects what was connected when the GUI last exited</source>
+            <translation>Подключает то, что было подключено при последнем выходе из GUI</translation>
         </message>
     </context>
     <context>

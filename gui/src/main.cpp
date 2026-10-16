@@ -91,6 +91,8 @@ int main(int argc, char *argv[])
     ConnectionManager manager;
     manager.reloadProfiles();
     TrayController tray(&manager);
+    // e.g. at logoff; the workers are also killed with the GUI
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &manager, &ConnectionManager::shutdownAll);
 
     QLocalServer server;
     QLocalServer::removeServer(instanceName());

@@ -86,6 +86,11 @@ void ManagementClient::terminate()
     send("signal SIGTERM");
 }
 
+void ManagementClient::restart()
+{
+    send("signal SIGHUP");
+}
+
 QString ManagementClient::quote(const QString &arg)
 {
     QString ret = "\"";

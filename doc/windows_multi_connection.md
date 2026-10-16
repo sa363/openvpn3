@@ -187,6 +187,28 @@ passwords).
 Without the agent, select `omicli.exe` as the worker in the settings and run
 the GUI as administrator.
 
+## Reconnecting
+
+The core reconnects by itself while the worker runs, e.g. after
+`ping-restart` or a network change. On top of that the GUI keeps the
+connections the user connected up:
+
+- When a worker exits without being asked to, e.g. because it crashed, the
+  server pushed a halt, the agent was not available or no adapter was free,
+  the GUI starts it again after 5, 10, 20, 40 and then every 60 seconds.
+  Errors another attempt won't fix (profile errors, failed authentication of
+  a profile with stored credentials, a second tunnel redirecting the default
+  gateway) end the attempts.
+- The connections that are up are remembered until the user disconnects
+  them, also when the GUI exits, and are connected again at the next start.
+- The workers are in a job object that is killed with the GUI, so no worker
+  stays behind when the GUI crashes or an installer terminates it.
+- When the agent service comes back after a restart, the GUI makes the
+  running workers set up their tunnels again (`signal SIGHUP` on the
+  management interface) and starts waiting connections right away.
+
+Both behaviours can be turned off in the settings.
+
 ## Logs and troubleshooting
 
 | What | Where |

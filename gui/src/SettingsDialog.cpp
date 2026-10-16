@@ -61,6 +61,15 @@ SettingsDialog::SettingsDialog(ConnectionManager *manager, QWidget *parent)
     hint->setWordWrap(true);
     form->addRow(hint);
 
+    autoReconnect_ = new QCheckBox(tr("Connect again when a connection fails"));
+    autoReconnect_->setChecked(manager->autoReconnect());
+    autoReconnect_->setToolTip(tr("Waits 5 s after the first failure and up to 60 s after further ones"));
+    form->addRow(autoReconnect_);
+    restoreOnStartup_ = new QCheckBox(tr("Restore the connections at startup"));
+    restoreOnStartup_->setChecked(manager->restoreOnStartup());
+    restoreOnStartup_->setToolTip(tr("Connects what was connected when the GUI last exited"));
+    form->addRow(restoreOnStartup_);
+
     // HTTP proxy, overrides http-proxy in the profiles
     const ProxySettings proxy = manager->proxy();
     useProxy_ = new QCheckBox(tr("Connect through an HTTP proxy"));
@@ -115,6 +124,8 @@ void SettingsDialog::accept()
         proxy.port = static_cast<quint16>(proxyPort_->value());
     }
     manager_->setProxy(proxy);
+    manager_->setAutoReconnect(autoReconnect_->isChecked());
+    manager_->setRestoreOnStartup(restoreOnStartup_->isChecked());
 
     manager_->setWorkerPath(QDir::fromNativeSeparators(workerPath_->text().trimmed()));
     const QString dir = QDir::fromNativeSeparators(configDir_->text().trimmed());

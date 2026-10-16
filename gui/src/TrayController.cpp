@@ -321,7 +321,8 @@ void TrayController::quit()
                                                   tr("%n connection(s) are active. Disconnect and exit?", nullptr, manager_->activeCount()));
         if (answer != QMessageBox::Yes)
             return;
-        manager_->disconnectAll();
+        // not disconnectAll(): the connections are restored with the next start
+        manager_->shutdownAll();
     }
 
     // wait for the workers to tear their tunnels down

@@ -7,6 +7,7 @@
 #include <QList>
 #include <QObject>
 #include <QString>
+#include <QTimer>
 
 class ConnectionManager : public QObject
 {
@@ -27,6 +28,12 @@ class ConnectionManager : public QObject
     QStringList autoConnectProfiles() const;
     void setAutoConnect(const QString &name, bool enabled);
     bool isAutoConnect(const QString &name) const;
+    // start failed connections again
+    bool autoReconnect() const;
+    void setAutoReconnect(bool enabled);
+    // at startup, connect what was connected when the GUI last ran
+    bool restoreOnStartup() const;
+    void setRestoreOnStartup(bool enabled);
     QString savedUsername(const QString &name) const;
     void setSavedUsername(const QString &name, const QString &username);
     bool canSavePasswords() const;
@@ -50,7 +57,11 @@ class ConnectionManager : public QObject
     // active connection also redirects the default gateway.
     bool canConnect(Connection *c, QString *conflict) const;
     void connectProfile(Connection *c);
+    // disconnect on behalf of the user
     void disconnectAll();
+    // disconnect because the GUI exits, the connections are restored next time
+    void shutdownAll();
+    // connect the profiles to connect on startup and the ones to restore
     void startAutoConnect();
 
   signals:
@@ -59,6 +70,12 @@ class ConnectionManager : public QObject
 
   private:
     void add(Connection *c);
+    void rememberWanted(const QString &name, bool wanted);
+    void watchAgent();
 
     QList<Connection *> connections_;
+
+    // the service is restarted e.g. by an upgrade, tunnels are set up again then
+    QTimer agentTimer_;
+    bool agentWasRunning_ = true;
 };

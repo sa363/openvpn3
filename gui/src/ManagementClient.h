@@ -53,6 +53,8 @@ class ManagementClient : public QObject
     void sendPassword(const QString &type, const QString &password);
     void releaseHold();
     void terminate();
+    // reconnect, which also sets up the tunnel again
+    void restart();
 
     // quote an argument of a management command
     static QString quote(const QString &arg);
