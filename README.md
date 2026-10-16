@@ -174,6 +174,13 @@ To build:
     > cmake --preset win-amd64-release
     > cmake --build --preset win-amd64-release --target ovpncli
 
+### Several simultaneous connections
+
+The `ovpnagent` service, the `omicliagent` workers, the Qt tray GUI in `gui/`
+and its MSI installer let several VPN connections run at the same time. See
+[doc/windows_multi_connection.md](doc/windows_multi_connection.md) for how to
+build, package and run them.
+
 ### Building with MinGW
 
 This build should work on both Windows and Linux.
