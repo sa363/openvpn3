@@ -42,6 +42,13 @@ class ManagementClient : public QObject
     void disconnectFromWorker();
     bool isReady() const;
 
+    // The last unprefixed line that was not followed by a notification. The
+    // worker sends its final error like that before it exits.
+    QString lastPlainLine() const
+    {
+        return lastPlainLine_;
+    }
+
     void sendUsername(const QString &type, const QString &username);
     void sendPassword(const QString &type, const QString &password);
     void releaseHold();
@@ -56,6 +63,8 @@ class ManagementClient : public QObject
     void disconnected();
     void stateChanged(const OmiState &state);
     void logLine(qint64 time, const QString &flags, const QString &text);
+    // further lines of a multi-line log message, or the worker's final error
+    void logContinuation(const QString &text);
     void byteCount(quint64 bytesIn, quint64 bytesOut);
     void passwordNeeded(const OmiPasswordRequest &request);
     // info is the CRV1 dynamic challenge string, if any
@@ -89,6 +98,7 @@ class ManagementClient : public QObject
     qint64 deadline_ = 0;
     QByteArray in_;
     bool ready_ = false;
+    QString lastPlainLine_;
 
     // history dumps of "log on all" / "state on all" arrive as
     // unprefixed lines terminated by END, in the order of the commands
