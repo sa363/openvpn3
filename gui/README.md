@@ -1,5 +1,8 @@
 # OpenVPN3 GUI
 
+See [doc/windows_multi_connection.md](../doc/windows_multi_connection.md) for the
+complete build of the core, agent, workers, GUI and installer.
+
 Tray application for Windows that runs several VPN connections at the same
 time, in the spirit of OpenVPN GUI.
 
