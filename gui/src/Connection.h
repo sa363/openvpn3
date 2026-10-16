@@ -6,6 +6,7 @@
 
 #include <QDateTime>
 #include <QList>
+#include <QMap>
 #include <QObject>
 #include <QProcess>
 #include <QString>
@@ -91,6 +92,8 @@ class Connection : public QObject
     {
         return state_ != State::Disconnected && state_ != State::Failed;
     }
+    // process id of the worker, 0 if it is not running
+    qint64 workerPid() const;
 
     // true if the profile itself contains redirect-gateway
     bool redirectsGateway() const;
@@ -122,10 +125,15 @@ class Connection : public QObject
     void errorOccurred(const QString &message);
     // the server rejected the credentials (not a dynamic challenge)
     void authenticationFailed(const QString &type);
+    // Routes of this tunnel overlap routes of the tunnel of another worker:
+    // each entry is "<our route> overlaps <its route>". otherPid is 0 when
+    // the agent only reported how many more there are.
+    void routeConflicts(qint64 otherPid, const QStringList &overlaps);
 
   private:
     void setState(State state, const QString &detail = QString());
     void appendLog(const QString &line);
+    void checkRouteConflict(const QString &text);
     void onOmiState(const OmiState &st);
     void onProcessFinished(int exitCode, QProcess::ExitStatus status);
     void killWorker();
@@ -147,6 +155,10 @@ class Connection : public QObject
     QList<TrafficSample> traffic_;
     QDateTime connectedSince_;
     QStringList log_;
+
+    // ROUTE CONFLICT lines of the agent, reported together
+    QMap<qint64, QStringList> pendingConflicts_;
+    QTimer conflictTimer_;
 
     // CRV1 challenge from the last auth failure, answered with the next
     // password request

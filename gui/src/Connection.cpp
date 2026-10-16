@@ -10,6 +10,8 @@
 #include <QTcpServer>
 #include <QUuid>
 
+#include <utility>
+
 #ifdef Q_OS_WIN
 #include <windows.h>
 #endif
@@ -78,7 +80,18 @@ Connection::Connection(const QString &name, const QString &configPath, QObject *
             killWorker();
         } });
 
-    connect(&omi_, &ManagementClient::logContinuation, this, &Connection::appendLog);
+    conflictTimer_.setSingleShot(true);
+    conflictTimer_.setInterval(500);
+    connect(&conflictTimer_, &QTimer::timeout, this, [this]()
+            {
+        const auto pending = std::exchange(pendingConflicts_, {});
+        for (auto it = pending.cbegin(); it != pending.cend(); ++it)
+            emit routeConflicts(it.key(), it.value()); });
+
+    connect(&omi_, &ManagementClient::logContinuation, this, [this](const QString &text)
+            {
+        appendLog(text);
+        checkRouteConflict(text); });
     connect(&omi_, &ManagementClient::ready, this, [this]()
             { appendLog(tr("Management interface connected")); });
     connect(&omi_, &ManagementClient::connectFailed, this, [this](const QString &reason)
@@ -94,7 +107,8 @@ Connection::Connection(const QString &name, const QString &configPath, QObject *
     connect(&omi_, &ManagementClient::logLine, this, [this](qint64 time, const QString &flags, const QString &text)
             {
         const QString ts = QDateTime::fromSecsSinceEpoch(time).toString("yyyy-MM-dd hh:mm:ss");
-        appendLog(ts + ' ' + (flags.isEmpty() ? QString() : flags + ' ') + text); });
+        appendLog(ts + ' ' + (flags.isEmpty() ? QString() : flags + ' ') + text);
+        checkRouteConflict(text); });
     connect(&omi_, &ManagementClient::byteCount, this, [this](quint64 in, quint64 out)
             {
         const qint64 now = QDateTime::currentMSecsSinceEpoch();
@@ -171,6 +185,25 @@ Connection::~Connection()
         }
     }
     closeExitEvent();
+}
+
+qint64 Connection::workerPid() const
+{
+    return process_ && process_->state() != QProcess::NotRunning ? process_->processId() : 0;
+}
+
+// "ROUTE CONFLICT: <route> overlaps <route> of the tunnel of process <pid>", sent by the agent
+void Connection::checkRouteConflict(const QString &text)
+{
+    static const QRegularExpression re(R"(ROUTE CONFLICT: (\S+ overlaps \S+) of the tunnel of process (\d+))");
+    static const QRegularExpression more(R"(ROUTE CONFLICT: (\d+) more)");
+    if (const QRegularExpressionMatch m = re.match(text); m.hasMatch())
+        pendingConflicts_[m.captured(2).toLongLong()].append(m.captured(1));
+    else if (const QRegularExpressionMatch m2 = more.match(text); m2.hasMatch())
+        pendingConflicts_[0].append(m2.captured(1));
+    else
+        return;
+    conflictTimer_.start();
 }
 
 QString Connection::stateText(State state)
