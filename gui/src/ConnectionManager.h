@@ -21,6 +21,9 @@ class ConnectionManager : public QObject
     QString workerPath() const;
     void setWorkerPath(const QString &path);
     QString logDir() const;
+    // HTTP proxy for all connections, empty host for none
+    ProxySettings proxy() const;
+    void setProxy(const ProxySettings &proxy);
     QStringList autoConnectProfiles() const;
     void setAutoConnect(const QString &name, bool enabled);
     bool isAutoConnect(const QString &name) const;

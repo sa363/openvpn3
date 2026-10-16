@@ -3,7 +3,9 @@
 #include <QDialog>
 
 class ConnectionManager;
+class QCheckBox;
 class QLineEdit;
+class QSpinBox;
 
 class SettingsDialog : public QDialog
 {
@@ -18,4 +20,7 @@ class SettingsDialog : public QDialog
     ConnectionManager *manager_;
     QLineEdit *configDir_ = nullptr;
     QLineEdit *workerPath_ = nullptr;
+    QCheckBox *useProxy_ = nullptr;
+    QLineEdit *proxyHost_ = nullptr;
+    QSpinBox *proxyPort_ = nullptr;
 };

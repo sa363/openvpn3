@@ -88,8 +88,9 @@ void TrayController::requestConnect(Connection *c)
                         tr("Both \"%1\" and the active connection \"%2\" redirect all traffic "
                            "(redirect-gateway). Only one of them can be the default route.")
                             .arg(c->name(), conflict));
+        // the agent refuses a second tunnel that redirects the default gateway,
+        // so there is no point in connecting anyway
         QPushButton *replace = box.addButton(tr("Disconnect \"%1\"").arg(conflict), QMessageBox::AcceptRole);
-        QPushButton *anyway = box.addButton(tr("Connect anyway"), QMessageBox::DestructiveRole);
         box.addButton(QMessageBox::Cancel);
         box.exec();
         if (box.clickedButton() == replace)
@@ -107,10 +108,8 @@ void TrayController::requestConnect(Connection *c)
                 delete conn;
                 manager_->connectProfile(c); });
             other->stop();
-            return;
         }
-        else if (box.clickedButton() != anyway)
-            return;
+        return;
     }
 
     manager_->connectProfile(c);

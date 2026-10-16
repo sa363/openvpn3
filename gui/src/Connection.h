@@ -5,11 +5,27 @@
 #include "ManagementClient.h"
 
 #include <QDateTime>
+#include <QList>
 #include <QObject>
 #include <QProcess>
 #include <QString>
 #include <QStringList>
 #include <QTimer>
+
+// traffic rate at one point in time, bytes per second
+struct TrafficSample
+{
+    qint64 time = 0; // ms since epoch
+    double in = 0;
+    double out = 0;
+};
+
+// HTTP proxy the worker connects through, empty host for none
+struct ProxySettings
+{
+    QString host;
+    quint16 port = 0;
+};
 
 class Connection : public QObject
 {
@@ -62,6 +78,11 @@ class Connection : public QObject
     {
         return connectedSince_;
     }
+    // traffic rates of the current session, oldest first
+    const QList<TrafficSample> &trafficHistory() const
+    {
+        return traffic_;
+    }
     const QStringList &log() const
     {
         return log_;
@@ -76,7 +97,12 @@ class Connection : public QObject
 
     static QString stateText(State state);
 
-    void start(const QString &workerPath, const QString &logDir);
+    void start(const QString &workerPath, const QString &logDir, const ProxySettings &proxy = ProxySettings());
+
+    // how many logs of earlier sessions are kept per profile
+    static constexpr int keptLogs = 5;
+    // file of the current session's log, the earlier ones are <name>.1.log ... <name>.5.log
+    static QString logFile(const QString &logDir, const QString &profile);
     void stop();
 
     // answers to passwordNeeded()
@@ -118,6 +144,7 @@ class Connection : public QObject
     OmiState omiState_;
     quint64 bytesIn_ = 0;
     quint64 bytesOut_ = 0;
+    QList<TrafficSample> traffic_;
     QDateTime connectedSince_;
     QStringList log_;
 
