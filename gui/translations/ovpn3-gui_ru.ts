@@ -147,16 +147,16 @@
             <translation>%1: %2</translation>
         </message>
         <message>
-            <source>All VPN adapters are in use. Each simultaneous connection needs its own adapter; add one from an elevated prompt, e.g. with "tapctl create --hwid ovpn-dco" from OpenVPN Community.</source>
-            <translation>Все VPN-адаптеры заняты. Каждому одновременному подключению нужен свой адаптер; добавьте его из командной строки администратора, например командой "tapctl create --hwid ovpn-dco" из OpenVPN Community.</translation>
-        </message>
-        <message>
             <source>Another connection already redirects all traffic (redirect-gateway). Only one connection can be the default route; disconnect the other one first.</source>
             <translation>Весь трафик уже перенаправляет другое подключение (redirect-gateway). Маршрутом по умолчанию может быть только одно подключение; сначала отключите другое.</translation>
         </message>
         <message>
             <source>Using HTTP proxy %1:%2</source>
             <translation>Используется HTTP-прокси %1:%2</translation>
+        </message>
+        <message>
+            <source>No free VPN adapter for this connection: all adapters of the needed driver (ovpn-dco, TAP or Wintun) are in use or none is installed. Each simultaneous connection needs its own adapter; add one from an elevated prompt, e.g. with "tapctl create --hwid ovpn-dco" from OpenVPN Community. The worker log shows which driver was used.</source>
+            <translation>Нет свободного VPN-адаптера для этого подключения: все адаптеры нужного драйвера (ovpn-dco, TAP или Wintun) заняты или не установлены. Каждому одновременному подключению нужен свой адаптер; добавьте его из командной строки администратора, например командой "tapctl create --hwid ovpn-dco" из OpenVPN Community. Какой драйвер использовался, видно в журнале рабочего процесса.</translation>
         </message>
     </context>
     <context>

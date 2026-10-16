@@ -136,9 +136,11 @@ Connection::Connection(const QString &name, const QString &configPath, QObject *
         // every simultaneous connection needs an adapter of its own
         if (message.contains("cannot acquire TAP handle"))
         {
-            fatalError_ = tr("All VPN adapters are in use. Each simultaneous connection needs its own adapter; "
-                             "add one from an elevated prompt, e.g. with \"tapctl create --hwid ovpn-dco\" "
-                             "from OpenVPN Community.");
+            fatalError_ = tr("No free VPN adapter for this connection: all adapters of the needed driver "
+                             "(ovpn-dco, TAP or Wintun) are in use or none is installed. Each simultaneous "
+                             "connection needs its own adapter; add one from an elevated prompt, e.g. with "
+                             "\"tapctl create --hwid ovpn-dco\" from OpenVPN Community. The worker log shows "
+                             "which driver was used.");
             appendLog(fatalError_);
         }
         // the agent refused a second tunnel taking over the default route,
